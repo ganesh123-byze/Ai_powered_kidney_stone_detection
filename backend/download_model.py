@@ -74,31 +74,46 @@ def main():
         MODEL_DIR.mkdir(parents=True, exist_ok=True)
         import shutil
         shutil.copy(LOCAL_MODEL_PATH, MODEL_PATH)
+        print(f"✓ Model copied to {MODEL_PATH}")
         return 0
     
     # Render deployment: download from GitHub
-    if os.getenv('RENDER'):
-        print(f"📦 Render environment detected - downloading model from GitHub...")
-        
-        if download_file(GITHUB_RELEASE_URL, MODEL_PATH):
-            return 0
-        # Try backup URL if primary fails
-        elif BACKUP_URL and download_file(BACKUP_URL, MODEL_PATH):
-            return 0
-        else:
-            print("\n⚠️  WARNING: Model download failed!")
-            print("The model will need to be downloaded manually or provided via:")
-            print("  1. Upload to GitHub Releases: https://github.com/ganesh123-byze/Ai_powered_kidney_stone_detection/releases")
-            print("  2. Use Render persistent disk")
-            print("  3. Mount model from external storage")
-            return 1
+    print(f"📦 Downloading model from GitHub Releases...")
+    MODEL_DIR.mkdir(parents=True, exist_ok=True)
     
-    print("✗ Model not found and download URLs not configured")
-    print("\nTo set up model download:")
-    print("  1. Upload model to: https://github.com/ganesh123-byze/Ai_powered_kidney_stone_detection/releases/new")
-    print("  2. Update GITHUB_RELEASE_URL in this script")
-    print("  3. Re-deploy to Render")
-    return 1
+    if download_file(GITHUB_RELEASE_URL, MODEL_PATH):
+        size_mb = MODEL_PATH.stat().st_size / 1024 / 1024
+        print(f"✓ Model ready: {size_mb:.1f}MB")
+        return 0
+    
+    # Try backup URL if primary fails
+    if BACKUP_URL:
+        print(f"\n⚠️  Primary URL failed, trying backup...")
+        if download_file(BACKUP_URL, MODEL_PATH):
+            return 0
+    
+    # Model download failed - provide helpful message
+    print("\n" + "=" * 60)
+    print("✗ MODEL DOWNLOAD FAILED")
+    print("=" * 60)
+    print("\nThe model file could not be downloaded from GitHub Releases.")
+    print("This is EXPECTED if this is the first deployment.")
+    print("\n📌 TO FIX THIS:")
+    print("1. Upload your model to GitHub Releases:")
+    print("   https://github.com/ganesh123-byze/Ai_powered_kidney_stone_detection/releases")
+    print("")
+    print("2. Copy the download URL and update this script:")
+    print("   GITHUB_RELEASE_URL = 'your-url-here'")
+    print("")
+    print("3. Re-deploy to Render or run this script again.")
+    print("")
+    print("⏳ For now, continuing without model...")
+    print("   (API will work but predictions will fail until model is available)")
+    print("=" * 60 + "\n")
+    
+    # Don't exit with error - allows server to start
+    # API will fail gracefully when trying to predict without model
+    return 0
 
 
 if __name__ == "__main__":
