@@ -5,13 +5,13 @@ Singleton pattern for loading and caching models.
 """
 
 import os
-from pathlib import Path
-from typing import Dict, List, Optional, Any
 import json
 import threading
+from pathlib import Path
+from typing import Dict, List, Optional, Any
+
 import numpy as np
 from loguru import logger
-
 import onnxruntime as rt
 
 
@@ -38,11 +38,11 @@ class ModelLoader:
             return
         
         self._session: Optional[rt.InferenceSession] = None
-        self._class_names: List[str] = []
+        self._class_names: List[str] = ['Normal', 'Stone']
         self._model_path: Optional[str] = None
         self._initialized = True
         
-        logger.info("ModelLoader singleton initialized (ONNX Runtime - CPU only)")
+        logger.info("ModelLoader singleton initialized (ONNX Runtime - CPU optimized)")
     
     @property
     def is_loaded(self) -> bool:
@@ -73,8 +73,7 @@ class ModelLoader:
             logger.info(f"Converting PyTorch model {pth_path} to ONNX...")
             
             import torch
-            import torch.onnx
-            from PIL import Image
+            import torchvision.models as models
             
             device = torch.device('cpu')
             
@@ -97,8 +96,6 @@ class ModelLoader:
                     break
             
             # Create and load model
-            import torchvision.models as models
-            
             if model_name == 'resnet50':
                 model = models.resnet50(weights=None)
                 model.fc = torch.nn.Sequential(
@@ -114,10 +111,12 @@ class ModelLoader:
             
             model.load_state_dict(state_dict)
             model.eval()
-            model.to(device)
             
             # Create dummy input
             dummy_input = torch.randn(1, 3, 224, 224, device=device)
+            
+            # Ensure output directory exists
+            os.makedirs(os.path.dirname(onnx_path), exist_ok=True)
             
             # Export to ONNX
             torch.onnx.export(
@@ -139,25 +138,17 @@ class ModelLoader:
     def load_model(
         self,
         model_path: str,
+        model_name: Optional[str] = None,
         device: str = 'cpu',
         force_reload: bool = False
     ) -> rt.InferenceSession:
         """
         Load an ONNX model using ONNX Runtime.
         Automatically converts .pth to .onnx if needed.
-        
-        Args:
-            model_path: Path to model (.onnx or .pth file)
-            device: Device to use ('cpu' only supported)
-            force_reload: Force reload even if model is already loaded
-        
-        Returns:
-            ONNX Runtime InferenceSession
         """
         
         # Skip if already loaded with same path
         if self._session is not None and self._model_path == model_path and not force_reload:
-            logger.info("Model already loaded, returning cached session")
             return self._session
         
         with self._lock:
@@ -165,38 +156,29 @@ class ModelLoader:
             if self._session is not None and self._model_path == model_path and not force_reload:
                 return self._session
             
-            model_path = Path(model_path)
-            
-            # Check if model exists
-            if not model_path.exists():
+            # Path handling
+            path = Path(model_path)
+            if not path.exists():
                 raise FileNotFoundError(f"Model file not found: {model_path}")
             
-            # If .pth file, convert to .onnx
-            if model_path.suffix == '.pth':
-                onnx_path = model_path.parent / model_path.stem / '.onnx'
+            # Automatic .pth to .onnx conversion
+            if path.suffix == '.pth':
+                onnx_path = path.with_suffix('.onnx')
                 if not onnx_path.exists():
-                    logger.info(f"ONNX model not found, converting from PyTorch...")
-                    self._convert_pth_to_onnx(str(model_path), str(onnx_path))
-                model_path = onnx_path
+                    self._convert_pth_to_onnx(str(path), str(onnx_path))
+                path = onnx_path
             
-            logger.info(f"Loading ONNX model from: {model_path}")
-            
-            # Create ONNX Runtime session (CPU only)
+            # Load session
+            logger.info(f"Loading ONNX model: {path}")
             providers = ['CPUExecutionProvider']
             self._session = rt.InferenceSession(
-                str(model_path),
+                str(path),
                 providers=providers,
                 sess_options=self._get_session_options()
             )
             
             # Load class names
-            self._load_class_names(model_path)
-            
-            logger.info(f"✓ Model loaded successfully")
-            logger.info(f"  Classes: {self._class_names}")
-            logger.info(f"  CPU-only inference (ONNX Runtime)")
-            
-            # Store path for caching
+            self._load_class_names(path)
             self._model_path = str(model_path)
             
             return self._session
@@ -204,29 +186,23 @@ class ModelLoader:
     def _get_session_options(self) -> rt.SessionOptions:
         """Get optimized ONNX Runtime session options."""
         so = rt.SessionOptions()
-        so.log_severity_level = 3  # Only errors
-        so.inter_op_num_threads = 1  # Single thread for consistency
-        so.intra_op_num_threads = 2  # Use 2 cores max (Render Free Tier limit)
+        so.log_severity_level = 3
+        so.inter_op_num_threads = 1
+        so.intra_op_num_threads = 1  # Safe default for shared CPU environments
         return so
     
     def _load_class_names(self, model_path: Path) -> None:
-        """Load class names from JSON file or use defaults."""
-        # Try loading from class_names.json in same directory
+        """Load class names from JSON or use defaults."""
         class_names_path = model_path.parent / 'class_names.json'
-        
         if class_names_path.exists():
             try:
                 with open(class_names_path, 'r') as f:
                     data = json.load(f)
-                    self._class_names = data.get('classes', data.get('class_names', []))
-                    logger.info(f"Loaded {len(self._class_names)} classes from {class_names_path}")
+                    self._class_names = data.get('classes', data.get('class_names', ['Normal', 'Stone']))
                     return
-            except Exception as e:
-                logger.warning(f"Failed to load class names from JSON: {e}")
-        
-        # Default class names if not found
+            except Exception:
+                pass
         self._class_names = ['Normal', 'Stone']
-        logger.info(f"Using default class names: {self._class_names}")
     
     def unload_model(self):
         """Unload the model and free memory."""
@@ -234,50 +210,27 @@ class ModelLoader:
             if self._session is not None:
                 del self._session
                 self._session = None
-                self._model_path = None
-                self._class_names = []
-                
-                logger.info("Model unloaded and memory freed")
-    
-    def unload_model(self):
-        """Unload the model and free memory."""
-        with self._lock:
-            if self._model is not None:
-                del self._model
-                self._model = None
-                self._model_path = None
-                self._class_names = []
-                
-                try:
-                    import torch
-                    if torch.cuda.is_available():
-                        torch.cuda.empty_cache()
-                except ImportError:
-                    pass
-                
-                logger.info("Model unloaded and memory freed")
-    
+            self._model_path = None
+            self._class_names = ['Normal', 'Stone']
+            logger.info("Model unloaded")
+
     def get_model_info(self) -> Dict[str, Any]:
         """Get information about the loaded model."""
-        if self._session is None:
-            return {'loaded': False, 'engine': 'ONNX Runtime'}
-        
         return {
-            'loaded': True,
+            'loaded': self.is_loaded,
             'model_path': self._model_path,
             'device': 'cpu',
             'num_classes': self.num_classes,
             'class_names': self._class_names,
-            'engine': 'ONNX Runtime (CPU-only)',
+            'engine': 'ONNX Runtime (CPU-optimized)',
         }
 
 
-# Global singleton instance
-_model_loader: Optional[ModelLoader] = None
+# Global instance getter
+_model_loader = None
 
 
 def get_model_loader() -> ModelLoader:
-    """Get the global ModelLoader singleton instance."""
     global _model_loader
     if _model_loader is None:
         _model_loader = ModelLoader()

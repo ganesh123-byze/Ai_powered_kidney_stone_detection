@@ -7,148 +7,130 @@ interface PredictionResultProps {
 }
 
 const PredictionResult: React.FC<PredictionResultProps> = ({ result, onReset }) => {
-  // Status color mapping for binary stone detection
-  const getSeverityConfig = (severity: string): { 
-    bgColor: string; 
-    textColor: string; 
-    borderColor: string;
+  const getSeverityConfig = (severity: string): {
+    bgColor: string;
+    textColor: string;
     icon: string;
   } => {
     const severityLower = severity.toLowerCase() as Lowercase<SeverityLevel>;
-    
-    switch (severityLower) {
-      case 'normal':
-        return {
-          bgColor: 'bg-green-50',
-          textColor: 'text-green-700',
-          borderColor: 'border-green-200',
-          icon: '✓',
-        };
-      case 'detected':
-        return {
-          bgColor: 'bg-red-50',
-          textColor: 'text-red-700',
-          borderColor: 'border-red-200',
-          icon: '⚠',
-        };
-      default:
-        return {
-          bgColor: 'bg-gray-50',
-          textColor: 'text-gray-700',
-          borderColor: 'border-gray-200',
-          icon: '?',
-        };
-    }
+    return severityLower === 'normal'
+      ? { bgColor: 'bg-green-500/15', textColor: 'text-green-300', icon: '✓' }
+      : { bgColor: 'bg-red-500/15', textColor: 'text-red-300', icon: '⚠' };
   };
 
   const severityConfig = getSeverityConfig(result.severity);
   const confidencePercent = Math.round(result.confidence * 100);
 
-  // Confidence color based on value
   const getConfidenceColor = (confidence: number): string => {
-    if (confidence >= 0.9) return 'text-green-600';
-    if (confidence >= 0.7) return 'text-yellow-600';
-    return 'text-red-600';
+    if (confidence >= 0.9) return 'text-green-400';
+    if (confidence >= 0.7) return 'text-yellow-400';
+    return 'text-red-400';
   };
 
   return (
-    <div className="w-full space-y-4 animate-fadeIn">
-      {/* Main Result Card */}
-      <div className={`${severityConfig.bgColor} ${severityConfig.borderColor} border-2 rounded-xl p-6 shadow-sm`}>
-        {/* Header with severity badge */}
+    <div className="w-full space-y-4 animate-slide-up">
+      {/* Result Header */}
+      <div className="backdrop-blur-sm bg-white/8 border border-white/15 rounded-xl p-6 sm:p-8">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-800">Prediction Result</h3>
-          <span
-            className={`${severityConfig.bgColor} ${severityConfig.textColor} ${severityConfig.borderColor} 
-              border px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1`}
-          >
+          <h3 className="text-lg sm:text-xl font-bold text-white">Analysis Result</h3>
+          <span className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 backdrop-blur-sm border ${
+            result.severity.toLowerCase() === 'normal'
+              ? 'bg-green-500/20 border-green-400/40 text-green-300'
+              : 'bg-red-500/20 border-red-400/40 text-red-300'
+          }`}>
             <span>{severityConfig.icon}</span>
             {result.severity}
           </span>
         </div>
 
-        {/* Predicted Class */}
+        {/* Prediction */}
         <div className="mb-6">
-          <p className="text-sm text-gray-500 mb-1">Predicted Condition</p>
-          <p className="text-2xl font-bold text-gray-900">{result.class}</p>
+          <p className="text-xs text-blue-200/60 mb-1">Detected</p>
+          <p className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-white to-blue-100 bg-clip-text text-transparent">
+            {result.class}
+          </p>
         </div>
 
-        {/* Confidence Meter */}
-        <div className="space-y-2">
+        {/* Confidence */}
+        <div className="space-y-3 bg-white/5 p-4 rounded-lg border border-white/10">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-gray-500">Confidence</p>
-            <p className={`text-lg font-bold ${getConfidenceColor(result.confidence)}`}>
+            <p className="text-sm font-semibold text-blue-100">Confidence</p>
+            <p className={`text-2xl font-bold ${getConfidenceColor(result.confidence)}`}>
               {confidencePercent}%
             </p>
           </div>
-          
-          {/* Progress Bar */}
-          <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+
+          <div className="relative w-full bg-white/10 rounded-full h-2.5 overflow-hidden border border-white/10">
             <div
-              className={`h-full rounded-full transition-all duration-500 ease-out ${
+              className={`h-full rounded-full transition-all duration-500 ${
                 result.confidence >= 0.9
-                  ? 'bg-green-500'
+                  ? 'bg-gradient-to-r from-green-400 to-emerald-500'
                   : result.confidence >= 0.7
-                  ? 'bg-yellow-500'
-                  : 'bg-red-500'
+                  ? 'bg-gradient-to-r from-yellow-400 to-amber-500'
+                  : 'bg-gradient-to-r from-orange-400 to-red-500'
               }`}
               style={{ width: `${confidencePercent}%` }}
             />
           </div>
+
+          <div className="flex justify-between items-center text-xs text-blue-200/60">
+            <span>
+              {result.confidence >= 0.95 ? '🟢 Excellent' :
+               result.confidence >= 0.85 ? '🟢 Very Good' :
+               result.confidence >= 0.75 ? '🟡 Good' :
+               result.confidence >= 0.60 ? '🟠 Fair' :
+               '🔴 Low'}
+            </span>
+            <span>{(result.confidence * 100).toFixed(1)}%</span>
+          </div>
         </div>
       </div>
 
-      {/* All Probabilities (if available) */}
+      {/* Probabilities */}
       {result.all_probabilities && (
-        <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
-          <h4 className="text-sm font-semibold text-gray-700 mb-3">All Class Probabilities</h4>
-          <div className="space-y-2">
+        <div className="backdrop-blur-sm bg-white/8 border border-white/15 rounded-xl p-6">
+          <h4 className="font-bold text-white text-sm mb-4">📊 Class Probabilities</h4>
+          <div className="space-y-3">
             {Object.entries(result.all_probabilities)
               .sort(([, a], [, b]) => b - a)
-              .map(([className, prob]) => (
-                <div key={className} className="flex items-center gap-3">
-                  <span className="text-sm text-gray-600 w-32 truncate">{className}</span>
-                  <div className="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
+              .map(([className, prob], index) => (
+                <div key={className}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-sm text-blue-100 font-medium">
+                      {index + 1}. {className}
+                    </span>
+                    <span className="text-sm font-bold text-cyan-300">
+                      {(Math.round(prob * 1000) / 10).toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="relative w-full bg-white/5 rounded-full h-2 overflow-hidden border border-white/10">
                     <div
-                      className="h-full bg-primary-500 rounded-full"
+                      className="h-full bg-gradient-to-r from-cyan-400 to-blue-500 rounded-full transition-all duration-500"
                       style={{ width: `${Math.round(prob * 100)}%` }}
                     />
                   </div>
-                  <span className="text-sm text-gray-500 w-12 text-right">
-                    {Math.round(prob * 100)}%
-                  </span>
                 </div>
               ))}
           </div>
         </div>
       )}
 
-      {/* Action Buttons */}
+      {/* Actions */}
       {onReset && (
-        <div className="flex justify-center pt-2">
-          <button
-            onClick={onReset}
-            className="px-6 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 
-              rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-colors duration-200
-              flex items-center gap-2"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-              />
-            </svg>
-            Analyze Another Image
-          </button>
-        </div>
+        <button
+          onClick={onReset}
+          className="w-full py-2.5 px-4 bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white font-semibold rounded-lg transition-all hover:shadow-lg text-sm border border-white/20"
+        >
+          Analyze Another Image
+        </button>
       )}
 
       {/* Disclaimer */}
-      <p className="text-xs text-gray-400 text-center mt-4">
-        ⚕️ This is an AI-assisted analysis tool. Always consult a qualified healthcare professional for diagnosis.
-      </p>
+      <div className="backdrop-blur-sm bg-blue-500/10 border border-blue-400/20 rounded-lg p-3 text-center">
+        <p className="text-xs text-blue-200/70 leading-relaxed">
+          ⓘ For educational purposes only. Consult healthcare professionals for diagnosis.
+        </p>
+      </div>
     </div>
   );
 };
