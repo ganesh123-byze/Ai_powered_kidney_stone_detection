@@ -9,7 +9,15 @@ from pathlib import Path
 from contextlib import asynccontextmanager
 from typing import Optional
 
-import torch
+# NOTE: torch is imported lazily to prevent blocking FastAPI startup
+# if torch is not yet installed during build process
+try:
+    import torch
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
+    torch = None
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -74,13 +82,19 @@ async def lifespan(app: FastAPI):
     
     # Log system info
     logger.info(f"Python version: {sys.version}")
-    logger.info(f"PyTorch version: {torch.__version__}")
-    logger.info(f"CUDA available: {torch.cuda.is_available()}")
     
-    if torch.cuda.is_available():
-        logger.info(f"CUDA version: {torch.version.cuda}")
-        logger.info(f"GPU: {torch.cuda.get_device_name(0)}")
-        logger.info(f"GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.2f} GB")
+    # Check PyTorch availability
+    if TORCH_AVAILABLE:
+        logger.info(f"PyTorch version: {torch.__version__}")
+        logger.info(f"CUDA available: {torch.cuda.is_available()}")
+        
+        if torch.cuda.is_available():
+            logger.info(f"CUDA version: {torch.version.cuda}")
+            logger.info(f"GPU: {torch.cuda.get_device_name(0)}")
+            logger.info(f"GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.2f} GB")
+    else:
+        logger.warning("⚠️  PyTorch not available yet - installing during build")
+        logger.warning("Predictions will fail until PyTorch is fully installed")
     
     # Create required directories
     Path("logs").mkdir(exist_ok=True)
@@ -88,7 +102,7 @@ async def lifespan(app: FastAPI):
     
     # Auto-load model - check environment variable first, then default path
     model_path = os.getenv("MODEL_PATH", "saved_models/best_model.pth")
-    if Path(model_path).exists():
+    if Path(model_path).exists() and TORCH_AVAILABLE:
         model_name = os.getenv("MODEL_NAME", "resnet50")
         logger.info(f"Auto-loading model from: {model_path}")
         try:
@@ -113,8 +127,8 @@ async def lifespan(app: FastAPI):
     except Exception:
         pass
     
-    # Clear CUDA cache
-    if torch.cuda.is_available():
+    # Clear CUDA cache if available
+    if TORCH_AVAILABLE and torch.cuda.is_available():
         torch.cuda.empty_cache()
     
     logger.info("Shutdown complete")
@@ -189,14 +203,16 @@ async def health_check(include_model_info: bool = False):
     """
     service = get_inference_service()
     
+    cuda_available = torch.cuda.is_available() if TORCH_AVAILABLE else False
+    
     response = HealthResponse(
-        status="healthy",
+        status="healthy" if TORCH_AVAILABLE else "initializing",
         version=API_VERSION,
-        model_loaded=service.model_loader.is_loaded,
-        cuda_available=torch.cuda.is_available()
+        model_loaded=service.model_loader.is_loaded if TORCH_AVAILABLE else False,
+        cuda_available=cuda_available
     )
     
-    if include_model_info:
+    if include_model_info and TORCH_AVAILABLE:
         info = service.get_model_info()
         response.model_info = ModelInfoResponse(**info)
     
