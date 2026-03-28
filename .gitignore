@@ -1,0 +1,176 @@
+# ============================================================================
+# Kidney Stone Detection - Professional .gitignore
+# ============================================================================
+
+# ============================================================================
+# Python
+# ============================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv
+env.bak/
+venv.bak/
+
+# Pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# ============================================================================
+# Node.js / Frontend
+# ============================================================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+dist/
+build/
+.turbo/
+
+# Node executables (shouldn't be in repo)
+/npm
+/npx
+/corepack
+npm.ps1
+npx.ps1
+npm.cmd
+npx.cmd
+corepack.cmd
+node.exe
+nodevars.bat
+
+# ============================================================================
+# Environment Variables (Keep Secrets Safe!)
+# ============================================================================
+.env
+.env.local
+.env.*.local
+.env.production.local
+
+# ============================================================================
+# IDE & Editor
+# ============================================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+*.sublime-project
+*.sublime-workspace
+
+# ============================================================================
+# OS Files
+# ============================================================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+desktop.ini
+
+# ============================================================================
+# Application Logs
+# ============================================================================
+logs/
+*.log
+
+# ============================================================================
+# Uploaded Data & Temporary Files
+# ============================================================================
+data/uploads/*
+!data/uploads/.gitkeep
+
+# ============================================================================
+# Model Files (Large Binary Files)
+# ============================================================================
+saved_models/best_model.pth
+saved_models/*.pth
+*.pt
+*.pkl
+*.pickle
+
+# Keep config & metadata
+!saved_models/class_names.json
+!saved_models/training_config.json
+!saved_models/final_results.json
+
+# ============================================================================
+# Training Data
+# ============================================================================
+data/Normal/*
+data/stone/*
+!data/Normal/.gitkeep
+!data/stone/.gitkeep
+
+# ============================================================================
+# OS & Temporary
+# ============================================================================
+*.tmp
+*.bak
+*.backup
+Thumbs.db
+.directory
+
+# ============================================================================
+# IDE Generated Files
+# ============================================================================
+.eslintcache
+.vite/
+
+# ============================================================================
+# Render & Deployment
+# ============================================================================
+render.yaml
+.env.*.render
+
+# ============================================================================
+# Docker
+# ============================================================================
+.dockerignore
+*.dockerignore
+
+# ============================================================================
+# Additional Node Files
+# ============================================================================
+*.tsbuildinfo
+.turbo/
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+.tern-port

@@ -1,0 +1,50 @@
+# ============================================================================
+# Git Attributes - Line Ending Management
+# ============================================================================
+# Ensure consistent line endings across platforms
+# Auto detect text files and normalize line endings to LF
+* text=auto
+# ============================================================================
+# Source Code (LF - Universal)
+# ============================================================================
+*.py text eol=lf
+*.js text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.jsx text eol=lf
+*.json text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.sh text eol=lf
+# ============================================================================
+# Windows Scripts (CRLF)
+# ============================================================================
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+# ============================================================================
+# Binary Files (No Conversion)
+# ============================================================================
+*.pth filter=lfs diff=lfs merge=lfs -text
+*.pt binary
+*.pkl binary
+*.pickle binary
+*.jpg binary
+*.jpeg binary
+*.png binary
+*.gif binary
+*.mp4 binary
+*.zip binary
+*.tar binary
+*.gz binary
+*.exe binary
+*.dll binary
+*.so binary
+# ============================================================================
+# Documents
+# ============================================================================
+*.pdf binary
+*.docx binary
+*.xlsx binary

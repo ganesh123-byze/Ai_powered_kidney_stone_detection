@@ -1,0 +1,17 @@
+{
+  "validation": {
+    "accuracy": 1.0,
+    "f1_macro": 1.0,
+    "f1_weighted": 1.0,
+    "loss": 1.4815980150963005e-06
+  },
+  "test": {
+    "accuracy": 1.0,
+    "f1_macro": 1.0,
+    "f1_weighted": 1.0,
+    "loss": 1.6567542940712452e-06
+  },
+  "training_time_minutes": 25.029518934090934,
+  "best_epoch": 2,
+  "total_epochs": 9
+}

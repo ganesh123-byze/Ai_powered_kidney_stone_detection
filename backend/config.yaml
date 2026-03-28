@@ -1,0 +1,98 @@
+# Kidney Ultrasound Classification System - Configuration
+# Copy this file to config.yaml and modify as needed
+
+# Model Configuration
+model:
+  # Model architecture: resnet50 or densenet121
+  architecture: resnet50
+  
+  # Path to trained model checkpoint
+  checkpoint_path: saved_models/best_model.pth
+  
+  # Device: cuda, cpu, or auto
+  device: auto
+  
+  # Use mixed precision for inference
+  use_amp: true
+
+# Training Configuration
+training:
+  # Batch size (keep small for 4GB VRAM)
+  batch_size: 8
+  
+  # Gradient accumulation steps (effective batch = batch_size * accumulation_steps)
+  accumulation_steps: 4
+  
+  # Number of epochs
+  epochs: 50
+  
+  # Initial learning rate
+  learning_rate: 0.0001
+  
+  # Weight decay (L2 regularization)
+  weight_decay: 0.0001
+  
+  # Validation split ratio
+  val_split: 0.2
+  
+  # Early stopping patience
+  patience: 10
+  
+  # Use mixed precision training
+  mixed_precision: true
+  
+  # Number of data loading workers
+  num_workers: 2
+  
+  # Random seed
+  seed: 42
+
+# Preprocessing Configuration
+preprocessing:
+  # Input image size
+  image_size: 224
+  
+  # Use CLAHE enhancement for ultrasound images
+  use_clahe: true
+  
+  # CLAHE clip limit
+  clahe_clip_limit: 2.0
+  
+  # Data augmentation strength: light, medium, heavy
+  augmentation: medium
+
+# Server Configuration
+server:
+  # Host address
+  host: 0.0.0.0
+  
+  # Port number
+  port: 8000
+  
+  # Enable debug mode
+  debug: false
+  
+  # CORS allowed origins (comma-separated)
+  cors_origins: "*"
+
+# Paths Configuration
+paths:
+  # Directory for uploaded files
+  upload_dir: data/uploads
+  
+  # Directory for saved models
+  model_dir: saved_models
+  
+  # Directory for logs
+  log_dir: logs
+
+# Logging Configuration
+logging:
+  # Log level: DEBUG, INFO, WARNING, ERROR
+  level: INFO
+  
+  # Log file rotation size
+  rotation: "10 MB"
+  
+  # Log retention period
+  retention: "7 days"
