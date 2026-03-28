@@ -5,16 +5,18 @@ Model inference with Grad-CAM support.
 
 import os
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union, Any
+from typing import Dict, List, Optional, Tuple, Union, Any, TYPE_CHECKING
 import json
 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
 import numpy as np
 import cv2
 from PIL import Image
 from loguru import logger
+
+if TYPE_CHECKING:
+    import torch
+    import torch.nn as nn
+    import torch.nn.functional as F
 
 from app.models.model_loader import get_model_loader, ModelLoader
 from app.services.preprocessing import get_preprocessor, ImagePreprocessor
@@ -25,7 +27,7 @@ class GradCAM:
     Gradient-weighted Class Activation Mapping for model interpretability.
     """
     
-    def __init__(self, model: nn.Module, target_layer: nn.Module):
+    def __init__(self, model: Any, target_layer: Any):  # nn.Module, nn.Module
         """
         Initialize Grad-CAM.
         
@@ -54,7 +56,7 @@ class GradCAM:
     
     def generate(
         self,
-        input_tensor: torch.Tensor,
+        input_tensor: Any,  # torch.Tensor
         target_class: Optional[int] = None
     ) -> Tuple[np.ndarray, int, float]:
         """
@@ -67,6 +69,8 @@ class GradCAM:
         Returns:
             heatmap, predicted_class, confidence
         """
+        import torch.nn.functional as F
+        
         self.model.eval()
         
         # Forward pass
@@ -208,7 +212,6 @@ class InferenceService:
         
         return 'Unknown'
     
-    @torch.no_grad()
     def predict(
         self,
         image_source: Union[str, Path, bytes, np.ndarray, Image.Image],
@@ -226,6 +229,8 @@ class InferenceService:
         Returns:
             Dictionary with prediction results
         """
+        import torch
+        
         if not self.model_loader.is_loaded:
             raise RuntimeError("Model not loaded. Call load_model() first.")
         
@@ -269,6 +274,8 @@ class InferenceService:
                 }
         
         # Run inference
+        import torch.nn.functional as F
+        
         model.eval()
         with torch.no_grad():
             outputs = model(tensor)

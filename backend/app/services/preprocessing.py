@@ -5,14 +5,16 @@ OpenCV-based preprocessing for inference.
 
 import io
 from pathlib import Path
-from typing import Tuple, Union, Optional
+from typing import Tuple, Union, Optional, TYPE_CHECKING, Any
 
 import cv2
 import numpy as np
-import torch
 from PIL import Image
-from torchvision import transforms
 from loguru import logger
+
+if TYPE_CHECKING:
+    import torch
+    from torchvision import transforms
 
 
 class ImagePreprocessor:
@@ -53,11 +55,8 @@ class ImagePreprocessor:
                 tileGridSize=clahe_grid_size
             )
         
-        # PyTorch transforms for normalization
-        self.normalize = transforms.Normalize(
-            mean=self.IMAGENET_MEAN,
-            std=self.IMAGENET_STD
-        )
+        # PyTorch transforms for normalization (deferred import)
+        self.normalize: Optional[Any] = None  # Will be initialized on first use
         
         logger.info(f"ImagePreprocessor initialized with size={image_size}, clahe={use_clahe}")
     
@@ -135,7 +134,7 @@ class ImagePreprocessor:
         self,
         source: Union[str, Path, bytes, np.ndarray, Image.Image],
         return_original: bool = False
-    ) -> Union[torch.Tensor, Tuple[torch.Tensor, np.ndarray]]:
+    ) -> Union[Any, Tuple[Any, np.ndarray]]:  # torch.Tensor or Tuple[torch.Tensor, np.ndarray]
         """
         Preprocess image for model inference.
         
@@ -147,6 +146,16 @@ class ImagePreprocessor:
             Preprocessed tensor ready for model input
             If return_original is True, also returns original resized image
         """
+        import torch
+        from torchvision import transforms
+        
+        # Initialize normalize on first use
+        if self.normalize is None:
+            self.normalize = transforms.Normalize(
+                mean=self.IMAGENET_MEAN,
+                std=self.IMAGENET_STD
+            )
+        
         # Load image
         image = self.load_image(source)
         

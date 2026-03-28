@@ -5,14 +5,14 @@ Singleton pattern for loading and caching models.
 
 import os
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional, Tuple, Any, TYPE_CHECKING
 import json
 import threading
-
-import torch
-import torch.nn as nn
-import torchvision.models as models
 from loguru import logger
+
+if TYPE_CHECKING:
+    import torch
+    import torch.nn as nn
 
 
 class ModelLoader:
@@ -36,9 +36,9 @@ class ModelLoader:
         if self._initialized:
             return
         
-        self._model: Optional[nn.Module] = None
+        self._model: Optional[Any] = None  # Optional[nn.Module]
         self._class_names: List[str] = []
-        self._device: torch.device = torch.device('cpu')
+        self._device: Optional[Any] = None  # torch.device, initialized on first use
         self._model_path: Optional[str] = None
         self._initialized = True
         
@@ -65,15 +65,18 @@ class ModelLoader:
         return len(self._class_names)
     
     @property
-    def device(self) -> torch.device:
+    def device(self) -> Any:  # torch.device
         """Get the device model is on."""
+        if self._device is None:
+            import torch
+            self._device = torch.device('cpu')
         return self._device
     
     def _create_model(
         self,
         model_name: str,
         num_classes: int
-    ) -> nn.Module:
+    ) -> Any:  # nn.Module
         """
         Create model architecture.
         
@@ -84,6 +87,10 @@ class ModelLoader:
         Returns:
             Model with correct architecture
         """
+        import torch
+        import torch.nn as nn
+        import torchvision.models as models
+        
         if model_name == 'resnet50':
             model = models.resnet50(weights=None)
             num_features = model.fc.in_features
@@ -109,7 +116,7 @@ class ModelLoader:
         model_name: str = 'resnet50',
         device: Optional[str] = None,
         force_reload: bool = False
-    ) -> nn.Module:
+    ) -> Any:  # nn.Module:
         """
         Load a trained model from checkpoint.
         
@@ -122,6 +129,8 @@ class ModelLoader:
         Returns:
             Loaded model in eval mode
         """
+        import torch
+        
         # Skip if already loaded with same path
         if self._model is not None and self._model_path == model_path and not force_reload:
             logger.info("Model already loaded, returning cached model")
@@ -204,8 +213,12 @@ class ModelLoader:
                 self._model_path = None
                 self._class_names = []
                 
-                if torch.cuda.is_available():
-                    torch.cuda.empty_cache()
+                try:
+                    import torch
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+                except ImportError:
+                    pass
                 
                 logger.info("Model unloaded and memory freed")
     
