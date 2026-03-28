@@ -1,0 +1,28 @@
+name: Keep Backend Warm (Free Tier)
+
+on:
+  schedule:
+    # Run every 14 minutes to prevent Render free tier hibernation (15 min timeout)
+    - cron: '*/14 * * * *'
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 🏥 Health Check - Keep Backend Awake
+        run: |
+          BACKEND_URL="https://kidney-detection-backend.onrender.com"
+          HEALTH_ENDPOINT="$BACKEND_URL/health"
+          
+          echo "🔍 Pinging $HEALTH_ENDPOINT..."
+          
+          if curl -f -s "$HEALTH_ENDPOINT" > /dev/null 2>&1; then
+            echo "✅ Backend is warm and responsive!"
+          else
+            echo "⚠️  Backend is starting up (this is normal on cold start)"
+          fi
+      
+      - name: 📊 Log Keep-Alive Check
+        run: echo "✅ Keep-alive check completed at $(date)"
