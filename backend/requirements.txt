@@ -26,3 +26,9 @@ loguru>=0.7.0
 
 # Visualization
 matplotlib>=3.7.0
+
+# For downloading models during deployment
+requests>=2.31.0
+
+# For production server
+gunicorn>=21.2.0  # Production WSGI server (optional, for better performance)
