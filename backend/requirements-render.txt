@@ -9,24 +9,21 @@ uvicorn[standard]>=0.24.0
 python-multipart>=0.0.6
 
 # ============================================================================
-# PyTorch (CPU - optimized for Render)
+# Lightweight Inference Engine (Memory-Optimized for Free Tier)
 # ============================================================================
-# CPU-only version for Render free/starter tier
-# Updated to available versions on PyPI
-torch>=2.9.0,<3.0.0
-torchvision>=0.18.0,<1.0.0
+# ONNX Runtime: 50MB vs PyTorch 800MB - perfect for Render Free tier
+onnxruntime>=1.16.0
 
 # ============================================================================
 # Image Processing
 # ============================================================================
-opencv-python>=4.8.0
 opencv-python-headless>=4.8.0  # For headless environments (Render)
 pillow>=10.0.0
 
 # ============================================================================
 # Data Science & Numerical
 # ============================================================================
-numpy>=1.26.0  # Compatible with torch 2.9+
+numpy>=1.24.0
 pandas>=2.0.0
 scikit-learn>=1.3.0
 
