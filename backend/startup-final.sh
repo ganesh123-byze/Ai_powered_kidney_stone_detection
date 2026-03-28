@@ -1,9 +1,9 @@
 #!/bin/bash
 # ============================================================================
-# Production Startup Wrapper for Render
+# Production Startup Wrapper for Render (ONNX Runtime - CPU-only)
 # ============================================================================
-# This wrapper ensures PyTorch is installed before starting Uvicorn.
-# It handles the case where installation might not be complete.
+# This wrapper ensures ONNX Runtime is working before starting Uvicorn.
+# No PyTorch installation needed - uses lightweightONNX Runtime instead.
 
 set -e
 
@@ -13,28 +13,15 @@ echo "=========================================="
 echo ""
 
 # Check Python
-echo "[1/3] Verifying Python..."
+echo "[1/2] Verifying Python..."
 python --version
 
-# Ensure torch is available (critical check)
-echo "[2/3] Final PyTorch verification..."
-if ! python -c "import torch; print(f'✓ PyTorch {torch.__version__}')" 2>/dev/null; then
-    echo "⚠️  PyTorch missing! Installing now..."
-    python -m pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu
-    
-    # Verify installation succeeded
-    if ! python -c "import torch" 2>/dev/null; then
-        echo "✗ CRITICAL: PyTorch installation failed!"
-        echo "  The server will start but predictions will fail."
-        echo "  This is a build issue - contact support."
-    fi
-fi
-
-# Verify model exists
-echo "[3/3] Checking model file..."
-if [ ! -f "saved_models/best_model.pth" ]; then
-    echo "⚠️  Model not found. Attempting download..."
-    python download_model.py || echo "  (Model will be downloaded on first request)"
+# Verify ONNX Runtime is available
+echo "[2/2] Verifying ONNX Runtime..."
+if ! python -c "import onnxruntime; print(f'✓ ONNX Runtime {onnxruntime.__version__}')" 2>/dev/null; then
+    echo "❌ CRITICAL: ONNX Runtime installation failed!"
+    echo "  Please check build logs."
+    exit 1
 fi
 
 echo ""
@@ -44,7 +31,7 @@ echo "Starting Uvicorn server..."
 echo "=========================================="
 echo ""
 
-# Start server
+# Start server (CPU-only, lightweight)
 exec uvicorn app.main:app \
     --host 0.0.0.0 \
     --port ${PORT:-8000} \

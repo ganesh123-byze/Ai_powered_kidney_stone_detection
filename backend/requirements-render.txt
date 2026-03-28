@@ -11,8 +11,17 @@ python-multipart>=0.0.6
 # ============================================================================
 # Lightweight Inference Engine (Memory-Optimized for Free Tier)
 # ============================================================================
-# ONNX Runtime: 50MB vs PyTorch 800MB - perfect for Render Free tier
+# ONNX Runtime: 50MB - lightweight CPU inference
 onnxruntime>=1.16.0
+
+# ============================================================================
+# PyTorch (ONE-TIME USE: .pth to .onnx conversion only)
+# ============================================================================
+# Only used on first deployment to convert .pth model to .onnx format.
+# After conversion, torch can be uninstalled (frees 1+ GB).
+# Re-add to requirements if you need to regenerate ONNX models.
+# torch>=2.0.0,<3.0.0
+# torchvision>=0.15.0,<1.0.0
 
 # ============================================================================
 # Image Processing

@@ -1,24 +1,25 @@
 """
-Kidney Ultrasound Classification - Model Loader
+Kidney Ultrasound Classification - ONNX Model Loader
+Lightweight inference using ONNX Runtime (CPU-only, no PyTorch needed).
 Singleton pattern for loading and caching models.
 """
 
 import os
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Any, TYPE_CHECKING
+from typing import Dict, List, Optional, Any
 import json
 import threading
+import numpy as np
 from loguru import logger
 
-if TYPE_CHECKING:
-    import torch
-    import torch.nn as nn
+import onnxruntime as rt
 
 
 class ModelLoader:
     """
-    Singleton class for loading and caching trained models.
+    Singleton class for loading and caching ONNX models.
     Ensures model is loaded only once and shared across requests.
+    CPU-only inference (perfect for Render Free Tier).
     """
     
     _instance = None
@@ -36,23 +37,22 @@ class ModelLoader:
         if self._initialized:
             return
         
-        self._model: Optional[Any] = None  # Optional[nn.Module]
+        self._session: Optional[rt.InferenceSession] = None
         self._class_names: List[str] = []
-        self._device: Optional[Any] = None  # torch.device, initialized on first use
         self._model_path: Optional[str] = None
         self._initialized = True
         
-        logger.info("ModelLoader singleton initialized")
+        logger.info("ModelLoader singleton initialized (ONNX Runtime - CPU only)")
     
     @property
     def is_loaded(self) -> bool:
         """Check if model is loaded."""
-        return self._model is not None
+        return self._session is not None
     
     @property
-    def model(self) -> Optional[nn.Module]:
-        """Get the loaded model."""
-        return self._model
+    def session(self) -> Optional[rt.InferenceSession]:
+        """Get the loaded ONNX session."""
+        return self._session
     
     @property
     def class_names(self) -> List[str]:
@@ -64,145 +64,180 @@ class ModelLoader:
         """Get number of classes."""
         return len(self._class_names)
     
-    @property
-    def device(self) -> Any:  # torch.device
-        """Get the device model is on."""
-        if self._device is None:
+    def _convert_pth_to_onnx(self, pth_path: str, onnx_path: str) -> None:
+        """
+        Convert PyTorch .pth model to ONNX format.
+        Only called on first deployment if .onnx doesn't exist.
+        """
+        try:
+            logger.info(f"Converting PyTorch model {pth_path} to ONNX...")
+            
             import torch
-            self._device = torch.device('cpu')
-        return self._device
-    
-    def _create_model(
-        self,
-        model_name: str,
-        num_classes: int
-    ) -> Any:  # nn.Module
-        """
-        Create model architecture.
-        
-        Args:
-            model_name: 'resnet50' or 'densenet121'
-            num_classes: Number of output classes
-        
-        Returns:
-            Model with correct architecture
-        """
-        import torch
-        import torch.nn as nn
-        import torchvision.models as models
-        
-        if model_name == 'resnet50':
-            model = models.resnet50(weights=None)
-            num_features = model.fc.in_features
-            model.fc = nn.Sequential(
-                nn.Dropout(0.5),
-                nn.Linear(num_features, num_classes)
+            import torch.onnx
+            from PIL import Image
+            
+            device = torch.device('cpu')
+            
+            # Load PyTorch checkpoint
+            checkpoint = torch.load(pth_path, map_location=device, weights_only=False)
+            
+            # Determine model architecture from checkpoint
+            state_dict = checkpoint.get('model_state_dict', checkpoint)
+            
+            # Infer architecture from state dict
+            model_name = 'resnet50'  # default
+            if 'features.0.weight' in state_dict:
+                model_name = 'densenet121'
+            
+            # Infer number of classes
+            num_classes = 2  # default
+            for key in state_dict:
+                if 'fc.1.weight' in key or 'classifier.1.weight' in key:
+                    num_classes = state_dict[key].shape[0]
+                    break
+            
+            # Create and load model
+            import torchvision.models as models
+            
+            if model_name == 'resnet50':
+                model = models.resnet50(weights=None)
+                model.fc = torch.nn.Sequential(
+                    torch.nn.Dropout(0.5),
+                    torch.nn.Linear(2048, num_classes)
+                )
+            else:
+                model = models.densenet121(weights=None)
+                model.classifier = torch.nn.Sequential(
+                    torch.nn.Dropout(0.5),
+                    torch.nn.Linear(1024, num_classes)
+                )
+            
+            model.load_state_dict(state_dict)
+            model.eval()
+            model.to(device)
+            
+            # Create dummy input
+            dummy_input = torch.randn(1, 3, 224, 224, device=device)
+            
+            # Export to ONNX
+            torch.onnx.export(
+                model,
+                dummy_input,
+                onnx_path,
+                input_names=['input'],
+                output_names=['output'],
+                opset_version=12,
+                do_constant_folding=True,
             )
-        elif model_name == 'densenet121':
-            model = models.densenet121(weights=None)
-            num_features = model.classifier.in_features
-            model.classifier = nn.Sequential(
-                nn.Dropout(0.5),
-                nn.Linear(num_features, num_classes)
-            )
-        else:
-            raise ValueError(f"Unknown model architecture: {model_name}")
-        
-        return model
+            
+            logger.info(f"✓ Model converted successfully to {onnx_path}")
+            
+        except Exception as e:
+            logger.error(f"Failed to convert PyTorch to ONNX: {e}")
+            raise
     
     def load_model(
         self,
         model_path: str,
-        model_name: str = 'resnet50',
-        device: Optional[str] = None,
+        device: str = 'cpu',
         force_reload: bool = False
-    ) -> Any:  # nn.Module:
+    ) -> rt.InferenceSession:
         """
-        Load a trained model from checkpoint.
+        Load an ONNX model using ONNX Runtime.
+        Automatically converts .pth to .onnx if needed.
         
         Args:
-            model_path: Path to model checkpoint (.pth file)
-            model_name: Model architecture ('resnet50' or 'densenet121')
-            device: Device to load model on ('cuda', 'cpu', or None for auto)
+            model_path: Path to model (.onnx or .pth file)
+            device: Device to use ('cpu' only supported)
             force_reload: Force reload even if model is already loaded
         
         Returns:
-            Loaded model in eval mode
+            ONNX Runtime InferenceSession
         """
-        import torch
         
         # Skip if already loaded with same path
-        if self._model is not None and self._model_path == model_path and not force_reload:
-            logger.info("Model already loaded, returning cached model")
-            return self._model
+        if self._session is not None and self._model_path == model_path and not force_reload:
+            logger.info("Model already loaded, returning cached session")
+            return self._session
         
         with self._lock:
             # Double-check after acquiring lock
-            if self._model is not None and self._model_path == model_path and not force_reload:
-                return self._model
+            if self._session is not None and self._model_path == model_path and not force_reload:
+                return self._session
             
-            # Determine device
-            if device is None:
-                self._device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-            else:
-                self._device = torch.device(device)
-            
-            logger.info(f"Loading model from: {model_path}")
-            logger.info(f"Using device: {self._device}")
-            
-            # Load checkpoint
             model_path = Path(model_path)
+            
+            # Check if model exists
             if not model_path.exists():
                 raise FileNotFoundError(f"Model file not found: {model_path}")
             
-            # weights_only=False needed for PyTorch 2.6+ (our checkpoint includes numpy arrays)
-            checkpoint = torch.load(model_path, map_location=self._device, weights_only=False)
+            # If .pth file, convert to .onnx
+            if model_path.suffix == '.pth':
+                onnx_path = model_path.parent / model_path.stem / '.onnx'
+                if not onnx_path.exists():
+                    logger.info(f"ONNX model not found, converting from PyTorch...")
+                    self._convert_pth_to_onnx(str(model_path), str(onnx_path))
+                model_path = onnx_path
             
-            # Get class names
-            if 'class_names' in checkpoint:
-                self._class_names = checkpoint['class_names']
-            else:
-                # Try loading from separate file
-                class_names_path = model_path.parent / 'class_names.json'
-                if class_names_path.exists():
-                    with open(class_names_path, 'r') as f:
-                        data = json.load(f)
-                        self._class_names = data.get('classes', [])
-                else:
-                    logger.warning("Class names not found, using generic names")
-                    # Try to infer from model output size
-                    state_dict = checkpoint.get('model_state_dict', checkpoint)
-                    for key in state_dict:
-                        if 'fc' in key and 'weight' in key:
-                            num_classes = state_dict[key].shape[0]
-                            self._class_names = [f'Class_{i}' for i in range(num_classes)]
-                            break
+            logger.info(f"Loading ONNX model from: {model_path}")
             
-            num_classes = len(self._class_names)
-            logger.info(f"Number of classes: {num_classes}")
-            logger.info(f"Class names: {self._class_names}")
+            # Create ONNX Runtime session (CPU only)
+            providers = ['CPUExecutionProvider']
+            self._session = rt.InferenceSession(
+                str(model_path),
+                providers=providers,
+                sess_options=self._get_session_options()
+            )
             
-            # Create model architecture
-            self._model = self._create_model(model_name, num_classes)
+            # Load class names
+            self._load_class_names(model_path)
             
-            # Load weights
-            state_dict = checkpoint.get('model_state_dict', checkpoint)
-            self._model.load_state_dict(state_dict)
-            
-            # Move to device and set to eval mode
-            self._model = self._model.to(self._device)
-            self._model.eval()
+            logger.info(f"✓ Model loaded successfully")
+            logger.info(f"  Classes: {self._class_names}")
+            logger.info(f"  CPU-only inference (ONNX Runtime)")
             
             # Store path for caching
             self._model_path = str(model_path)
             
-            # Clear CUDA cache
-            if self._device.type == 'cuda':
-                torch.cuda.empty_cache()
-            
-            logger.info("Model loaded successfully")
-            
-            return self._model
+            return self._session
+    
+    def _get_session_options(self) -> rt.SessionOptions:
+        """Get optimized ONNX Runtime session options."""
+        so = rt.SessionOptions()
+        so.log_severity_level = 3  # Only errors
+        so.inter_op_num_threads = 1  # Single thread for consistency
+        so.intra_op_num_threads = 2  # Use 2 cores max (Render Free Tier limit)
+        return so
+    
+    def _load_class_names(self, model_path: Path) -> None:
+        """Load class names from JSON file or use defaults."""
+        # Try loading from class_names.json in same directory
+        class_names_path = model_path.parent / 'class_names.json'
+        
+        if class_names_path.exists():
+            try:
+                with open(class_names_path, 'r') as f:
+                    data = json.load(f)
+                    self._class_names = data.get('classes', data.get('class_names', []))
+                    logger.info(f"Loaded {len(self._class_names)} classes from {class_names_path}")
+                    return
+            except Exception as e:
+                logger.warning(f"Failed to load class names from JSON: {e}")
+        
+        # Default class names if not found
+        self._class_names = ['Normal', 'Stone']
+        logger.info(f"Using default class names: {self._class_names}")
+    
+    def unload_model(self):
+        """Unload the model and free memory."""
+        with self._lock:
+            if self._session is not None:
+                del self._session
+                self._session = None
+                self._model_path = None
+                self._class_names = []
+                
+                logger.info("Model unloaded and memory freed")
     
     def unload_model(self):
         """Unload the model and free memory."""
@@ -224,15 +259,16 @@ class ModelLoader:
     
     def get_model_info(self) -> Dict[str, Any]:
         """Get information about the loaded model."""
-        if self._model is None:
-            return {'loaded': False}
+        if self._session is None:
+            return {'loaded': False, 'engine': 'ONNX Runtime'}
         
         return {
             'loaded': True,
             'model_path': self._model_path,
-            'device': str(self._device),
+            'device': 'cpu',
             'num_classes': self.num_classes,
             'class_names': self._class_names,
+            'engine': 'ONNX Runtime (CPU-only)',
         }
 
 

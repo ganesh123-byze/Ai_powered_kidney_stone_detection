@@ -1,102 +1,234 @@
 """
 Kidney Ultrasound Classification - Inference Service
-Model inference with Grad-CAM support.
+Lightweight CPU-only inference using ONNX Runtime (no PyTorch needed).
+Binary classification: Normal vs Stone (kidney stone detection).
 """
 
 import os
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union, Any, TYPE_CHECKING
+from typing import Dict, List, Optional, Tuple, Union, Any
 import json
 
 import numpy as np
 import cv2
 from PIL import Image
 from loguru import logger
+import onnxruntime as rt
 
-if TYPE_CHECKING:
-    import torch
-    import torch.nn as nn
-    import torch.nn.functional as F
-
-from app.models.model_loader import get_model_loader, ModelLoader
-from app.services.preprocessing import get_preprocessor, ImagePreprocessor
+from app.models.model_loader import get_model_loader
+from app.services.preprocessing import get_preprocessor
 
 
-class GradCAM:
+class InferenceService:
     """
-    Gradient-weighted Class Activation Mapping for model interpretability.
+    Service for running model inference on kidney ultrasound images.
+    Uses ONNX Runtime for CPU-only inference (Render Free Tier compatible).
+    Binary classification: Normal vs Stone (kidney stone detection).
     """
     
-    def __init__(self, model: Any, target_layer: Any):  # nn.Module, nn.Module
+    # Class mapping for binary stone detection
+    CLASS_MAPPING = {
+        'normal': 'Normal',
+        'healthy': 'Normal',
+        'stone': 'Detected',
+        'detected': 'Detected',
+    }
+    
+    def __init__(self, model_path: Optional[str] = None):
         """
-        Initialize Grad-CAM.
+        Initialize the inference service.
         
         Args:
-            model: The model to visualize
-            target_layer: The layer to generate CAM from (usually last conv layer)
+            model_path: Path to ONNX model (.onnx or .pth file)
         """
-        self.model = model
-        self.target_layer = target_layer
-        self.gradients = None
-        self.activations = None
+        self.model_loader = get_model_loader()
+        self.preprocessor = get_preprocessor()
+        self.session: Optional[rt.InferenceSession] = None
+        self.input_name: Optional[str] = None
+        self.output_name: Optional[str] = None
         
-        # Register hooks
-        self._register_hooks()
+        # Load model if path provided
+        if model_path:
+            self.load_model(model_path)
     
-    def _register_hooks(self):
-        """Register forward and backward hooks."""
-        def forward_hook(module, input, output):
-            self.activations = output.detach()
-        
-        def backward_hook(module, grad_input, grad_output):
-            self.gradients = grad_output[0].detach()
-        
-        self.target_layer.register_forward_hook(forward_hook)
-        self.target_layer.register_full_backward_hook(backward_hook)
-    
-    def generate(
-        self,
-        input_tensor: Any,  # torch.Tensor
-        target_class: Optional[int] = None
-    ) -> Tuple[np.ndarray, int, float]:
+    def load_model(self, model_path: str):
         """
-        Generate Grad-CAM heatmap.
+        Load ONNX model.
         
         Args:
-            input_tensor: Preprocessed input tensor
-            target_class: Class to generate CAM for (None = predicted class)
+            model_path: Path to model (.onnx or .pth file)
+        """
+        logger.info(f"Loading model from: {model_path}")
+        
+        # Use ModelLoader to handle .pth conversion if needed
+        session = self.model_loader.load_model(model_path)
+        self.session = session
+        
+        # Get input/output names
+        input_names = session.get_inputs()
+        output_names = session.get_outputs()
+        
+        if not input_names or not output_names:
+            raise ValueError("ONNX model has no inputs or outputs")
+        
+        self.input_name = input_names[0].name
+        self.output_name = output_names[0].name
+        
+        logger.info(f"✓ Model loaded successfully")
+        logger.info(f"  Input: {self.input_name}")
+        logger.info(f"  Output: {self.output_name}")
+        logger.info(f"  Classes: {self.model_loader.class_names}")
+    
+    def _get_class_label(self, class_name: str) -> str:
+        """
+        Map class name to user-friendly label.
+        
+        For binary stone detection:
+        - Normal -> 'Normal' (no stone)
+        - Stone -> 'Detected' (stone present)
+        
+        Args:
+            class_name: Predicted class name
         
         Returns:
-            heatmap, predicted_class, confidence
+            User-friendly label
         """
-        import torch.nn.functional as F
+        class_lower = class_name.lower().replace(' ', '_')
         
-        self.model.eval()
+        for key, label in self.CLASS_MAPPING.items():
+            if key in class_lower:
+                return label
         
-        # Forward pass
-        output = self.model(input_tensor)
+        # Fallback for binary classification
+        return 'Normal' if 'normal' in class_lower else 'Detected'
+    
+    def predict(
+        self,
+        image_source: Union[str, Path, bytes, np.ndarray, Image.Image],
+        return_all_probs: bool = False,
+    ) -> Dict[str, Any]:
+        """
+        Run inference on an image using ONNX Runtime.
         
-        # Get predicted class if not specified
-        if target_class is None:
-            target_class = output.argmax(dim=1).item()
+        Args:
+            image_source: Image source (path, bytes, array, or PIL Image)
+            return_all_probs: Return probabilities for all classes
         
-        # Get confidence
-        probs = F.softmax(output, dim=1)
-        confidence = probs[0, target_class].item()
+        Returns:
+            Dictionary with prediction results:
+            {
+                'prediction': 'Normal' or 'Detected',
+                'confidence': 0.0-1.0,
+                'class_index': 0 or 1,
+                'all_probabilities': [prob_class0, prob_class1],
+                'processing_time': seconds,
+                'engine': 'ONNX Runtime'
+            }
+        """
+        import time
         
-        # Backward pass
-        self.model.zero_grad()
-        output[0, target_class].backward()
+        if self.session is None:
+            raise RuntimeError("Model not loaded. Call load_model() first.")
         
-        # Generate CAM
-        gradients = self.gradients[0]  # (C, H, W)
-        activations = self.activations[0]  # (C, H, W)
+        start_time = time.time()
         
-        # Global average pooling of gradients
-        weights = gradients.mean(dim=(1, 2), keepdim=True)  # (C, 1, 1)
+        # Validate image
+        is_valid, error_msg = self.preprocessor.validate_image(image_source)
+        if not is_valid:
+            raise ValueError(f"Invalid image: {error_msg}")
         
-        # Weighted combination of activations
-        cam = (weights * activations).sum(dim=0)  # (H, W)
+        # Preprocess image to tensor
+        input_tensor = self.preprocessor.preprocess(image_source)
+        
+        # Convert to float32 if needed
+        if input_tensor.dtype != np.float32:
+            input_tensor = input_tensor.astype(np.float32)
+        
+        # Ensure correct shape: (1, 3, 224, 224)
+        if len(input_tensor.shape) == 3:
+            input_tensor = np.expand_dims(input_tensor, 0)
+        
+        logger.debug(f"Input tensor shape: {input_tensor.shape}, dtype: {input_tensor.dtype}")
+        
+        # Run inference using ONNX Runtime
+        try:
+            outputs = self.session.run(
+                [self.output_name],
+                {self.input_name: input_tensor}
+            )
+            logits = outputs[0]  # Output logits
+        except Exception as e:
+            logger.error(f"ONNX Runtime inference failed: {e}")
+            raise RuntimeError(f"Model inference failed: {e}")
+        
+        # Process outputs
+        logits = logits[0]  # Remove batch dimension
+        
+        # Convert to probabilities (softmax)
+        exp_logits = np.exp(logits - np.max(logits))  # Numerical stability
+        probs = exp_logits / np.sum(exp_logits)
+        
+        # Get top prediction
+        class_idx = int(np.argmax(probs))
+        confidence = float(probs[class_idx])
+        
+        class_names = self.model_loader.class_names
+        if not class_names or len(class_names) == 0:
+            class_names = ['Normal', 'Stone']  # Default fallback
+        
+        class_name = class_names[class_idx] if class_idx < len(class_names) else f"Class_{class_idx}"
+        prediction_label = self._get_class_label(class_name)
+        
+        # Calculate processing time
+        processing_time = time.time() - start_time
+        
+        # Build result dictionary
+        result = {
+            'prediction': prediction_label,
+            'predicted_class': class_name,
+            'class_index': class_idx,
+            'confidence': confidence,
+            'processing_time': round(processing_time, 3),
+            'engine': 'ONNX Runtime (CPU)',
+        }
+        
+        # Add all probabilities if requested
+        if return_all_probs:
+            result['all_probabilities'] = [float(p) for p in probs]
+            result['classes'] = class_names
+        
+        logger.info(
+            f"Prediction: {prediction_label} "
+            f"(confidence: {confidence:.3f}, "
+            f"time: {processing_time:.3f}s)"
+        )
+        
+        return result
+    
+    def get_model_info(self) -> Dict[str, Any]:
+        """Get information about the loaded model."""
+        if self.session is None:
+            return {'loaded': False, 'engine': 'ONNX Runtime'}
+        
+        return {
+            'loaded': True,
+            'engine': 'ONNX Runtime (CPU)',
+            'classes': self.model_loader.class_names,
+            'num_classes': self.model_loader.num_classes,
+            **self.model_loader.get_model_info()
+        }
+
+
+# Global singleton instance
+_inference_service: Optional[InferenceService] = None
+
+
+def get_inference_service() -> InferenceService:
+    """Get or create the global InferenceService singleton."""
+    global _inference_service
+    if _inference_service is None:
+        _inference_service = InferenceService()
+    return _inference_service
         
         # ReLU
         cam = F.relu(cam)

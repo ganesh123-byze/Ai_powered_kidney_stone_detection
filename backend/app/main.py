@@ -1,6 +1,7 @@
 """
 Kidney Ultrasound Classification - FastAPI Main Application
 Production-ready backend with async endpoints and proper error handling.
+Lightweight CPU-only inference using ONNX Runtime.
 """
 
 import os
@@ -9,15 +10,6 @@ from pathlib import Path
 from contextlib import asynccontextmanager
 from typing import Optional
 
-# NOTE: torch is imported lazily to prevent blocking FastAPI startup
-# if torch is not yet installed during build process
-try:
-    import torch
-    TORCH_AVAILABLE = True
-except ImportError:
-    TORCH_AVAILABLE = False
-    torch = None
-
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -25,7 +17,7 @@ from loguru import logger
 
 from app.routes import predict, upload
 from app.schemas.response import HealthResponse, ErrorResponse, ModelInfoResponse
-from app.services.inference import get_inference_service, initialize_inference_service
+from app.services.inference import get_inference_service
 
 
 # Configure logging
@@ -82,19 +74,8 @@ async def lifespan(app: FastAPI):
     
     # Log system info
     logger.info(f"Python version: {sys.version}")
-    
-    # Check PyTorch availability
-    if TORCH_AVAILABLE:
-        logger.info(f"PyTorch version: {torch.__version__}")
-        logger.info(f"CUDA available: {torch.cuda.is_available()}")
-        
-        if torch.cuda.is_available():
-            logger.info(f"CUDA version: {torch.version.cuda}")
-            logger.info(f"GPU: {torch.cuda.get_device_name(0)}")
-            logger.info(f"GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.2f} GB")
-    else:
-        logger.warning("⚠️  PyTorch not available yet - installing during build")
-        logger.warning("Predictions will fail until PyTorch is fully installed")
+    logger.info("Engine: ONNX Runtime (CPU-only, lightweight)")
+    logger.info("Model framework: ONNX (.onnx or auto-converted .pth)")
     
     # Create required directories
     Path("logs").mkdir(exist_ok=True)
@@ -102,18 +83,21 @@ async def lifespan(app: FastAPI):
     
     # Auto-load model - check environment variable first, then default path
     model_path = os.getenv("MODEL_PATH", "saved_models/best_model.pth")
-    if Path(model_path).exists() and TORCH_AVAILABLE:
-        model_name = os.getenv("MODEL_NAME", "resnet50")
+    if Path(model_path).exists():
         logger.info(f"Auto-loading model from: {model_path}")
         try:
-            initialize_inference_service(model_path, model_name)
+            service = get_inference_service()
+            service.load_model(model_path)
             logger.info(f"✓ Model loaded successfully: {model_path}")
         except Exception as e:
             logger.warning(f"Failed to auto-load model: {e}")
+            logger.warning(f"Use /api/v1/predict/model/load to load a model manually")
     else:
-        logger.warning(f"Model file not found at {model_path}. Use /api/v1/predict/model/load to load a model.")
+        logger.warning(f"Model file not found at {model_path}")
+        logger.warning(f"Use /api/v1/predict/model/load to load a model manually")
     
     logger.info("Application startup complete")
+    logger.info("Engine ready for predictions (ONNX Runtime - CPU optimized)")
     
     yield
     
@@ -126,10 +110,6 @@ async def lifespan(app: FastAPI):
         service.model_loader.unload_model()
     except Exception:
         pass
-    
-    # Clear CUDA cache if available
-    if TORCH_AVAILABLE and torch.cuda.is_available():
-        torch.cuda.empty_cache()
     
     logger.info("Shutdown complete")
 
@@ -203,16 +183,14 @@ async def health_check(include_model_info: bool = False):
     """
     service = get_inference_service()
     
-    cuda_available = torch.cuda.is_available() if TORCH_AVAILABLE else False
-    
     response = HealthResponse(
-        status="healthy" if TORCH_AVAILABLE else "initializing",
+        status="healthy",
         version=API_VERSION,
-        model_loaded=service.model_loader.is_loaded if TORCH_AVAILABLE else False,
-        cuda_available=cuda_available
+        model_loaded=service.model_loader.is_loaded,
+        cuda_available=False  # ONNX Runtime uses CPU only
     )
     
-    if include_model_info and TORCH_AVAILABLE:
+    if include_model_info:
         info = service.get_model_info()
         response.model_info = ModelInfoResponse(**info)
     
