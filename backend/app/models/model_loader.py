@@ -68,12 +68,27 @@ class ModelLoader:
         """
         Convert PyTorch .pth model to ONNX format.
         Only called on first deployment if .onnx doesn't exist.
+        Gracefully fails if PyTorch is not installed.
         """
         try:
-            logger.info(f"Converting PyTorch model {pth_path} to ONNX...")
-            
-            import torch
-            import torchvision.models as models
+            # Check if PyTorch is available
+            try:
+                import torch
+                import torchvision.models as models
+            except ImportError:
+                logger.error("❌ PyTorch is not installed!")
+                logger.error(f"Cannot convert {pth_path} to ONNX format.")
+                logger.error("")
+                logger.error("SOLUTION OPTIONS:")
+                logger.error("  1. Pre-convert model locally: pip install torch torchvision")
+                logger.error("     Then upload .onnx file to GitHub releases")
+                logger.error("  2. Download pre-converted .onnx model from GitHub releases")
+                logger.error("  3. Add torch to requirements.txt temporarily during build")
+                logger.error("")
+                raise RuntimeError(
+                    f"Cannot load {pth_path}: PyTorch not installed. "
+                    "Either provide a .onnx file or add torch to requirements.txt for conversion."
+                )
             
             device = torch.device('cpu')
             
