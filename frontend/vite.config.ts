@@ -15,7 +15,6 @@ export default defineConfig(({ mode }) => {
       },
     },
     server: {
-      // No hardcoded port: use VITE_DEV_PORT if provided, else Vite default/next free port.
       port: devPort,
       strictPort: false,
       proxy: {
@@ -25,6 +24,11 @@ export default defineConfig(({ mode }) => {
           rewrite: (path) => path.replace(/^\/api/, ''),
         },
       },
+    },
+    preview: {
+      port: 3000,
+      strictPort: false,
+      host: '0.0.0.0',
     },
   }
 })
