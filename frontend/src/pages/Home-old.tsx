@@ -75,9 +75,7 @@ const Home: React.FC = () => {
     setError(null);
   };
 
-  const modelInfo = health?.model_info;
   const isModelLoaded = health?.model_loaded ?? health?.model_info?.loaded ?? false;
-  const cudaAvailable = health?.cuda_available ?? false;
   const deviceType = health?.model_info?.device || 'CPU'; // Get actual device from backend
 
   // Track analysis count

@@ -75,7 +75,6 @@ const Home: React.FC = () => {
     setError(null);
   };
 
-  const modelInfo = health?.model_info;
   const isModelLoaded = health?.model_loaded ?? health?.model_info?.loaded ?? false;
   const deviceType = health?.model_info?.device || 'CPU';
 

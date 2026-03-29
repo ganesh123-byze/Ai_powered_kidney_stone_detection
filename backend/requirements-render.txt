@@ -57,4 +57,3 @@ gunicorn>=21.2.0  # Optional: better performance than uvicorn alone
 # Monitoring & Health (optional)
 # ============================================================================
 # prometheus-client>=0.17.0  # Uncomment for metrics
-onnx onnxruntime onnxscript
