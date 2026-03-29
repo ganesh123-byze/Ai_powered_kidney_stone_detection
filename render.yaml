@@ -32,7 +32,7 @@ services:
     
     rootDir: frontend
     
-    buildCommand: npm install && npm run build
+    buildCommand: VITE_API_URL=https://kidney-detection-backend.onrender.com npm install && npm run build
     
     startCommand: npx serve -s dist -l 3000 --no-clipboard --cors --single
     
