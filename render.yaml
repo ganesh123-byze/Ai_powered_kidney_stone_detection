@@ -49,7 +49,7 @@ services:
       - key: MAX_UPLOAD_SIZE
         value: "50"
 
-  - type: static
+  - type: web
     name: kidney-detection-frontend
     plan: free  # FREE TIER - $0/month
     
@@ -59,17 +59,8 @@ services:
     # Build command
     buildCommand: npm install && npm run build
     
-    # Static files directory
-    staticPublishPath: dist
-    
-    # Cache policy
-    headers:
-      - path: /index.html
-        name: Cache-Control
-        value: "no-cache, no-store, must-revalidate"
-      - path: /assets/*
-        name: Cache-Control
-        value: "public, max-age=31536000, immutable"
+    # Start command - serve static files
+    startCommand: npm install -g serve && serve -s dist -l 3000
     
     # Environment variables
     envVars:
