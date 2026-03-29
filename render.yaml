@@ -49,6 +49,7 @@ services:
 
   - type: web
     name: kidney-detection-frontend
+    runtime: node
     plan: free  # FREE TIER - $0/month
     
     # Root directory of the service
