@@ -11,13 +11,15 @@ A production-ready AI system for detecting kidney stones in ultrasound images us
 
 | Component | URL | Status |
 |-----------|-----|--------|
-| **Web Application** | 🔗 [kidney-detection-frontend.onrender.com](https://kidney-detection-frontend.onrender.com) | ✅ Live |
+| **Web Application (Render)** | 🔗 [kidney-detection-frontend.onrender.com](https://kidney-detection-frontend.onrender.com) | ✅ Live |
+| **Web Application (Vercel)** | 🔗 [ai-powered-kidney-stone-detection.vercel.app](https://ai-powered-kidney-stone-detection.vercel.app) | ✅ Live |
 | **Backend API** | 🔗 [kidney-detection-backend-9n06.onrender.com](https://kidney-detection-backend-9n06.onrender.com) | ✅ Live |
 | **API Documentation** | 🔗 [API Docs (Swagger)](https://kidney-detection-backend-9n06.onrender.com/docs) | ✅ Live |
 | **Health Check** | 🔗 [Health Status](https://kidney-detection-backend-9n06.onrender.com/health) | ✅ Live |
 
 ### 🚀 Quick Access
-- **Try Now:** https://kidney-detection-frontend.onrender.com
+- **Try Now (Render):** https://kidney-detection-frontend.onrender.com
+- **Try Now (Vercel):** https://ai-powered-kidney-stone-detection.vercel.app
 - **API Reference:** https://kidney-detection-backend-9n06.onrender.com/docs
 - **GitHub Repository:** [ganesh123-byze/Ai_powered_kidney_stone_detection](https://github.com/ganesh123-byze/Ai_powered_kidney_stone_detection)
 
