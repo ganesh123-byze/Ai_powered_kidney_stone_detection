@@ -1,0 +1,81 @@
+services:
+  - type: web
+    name: kidney-detection-backend
+    runtime: python
+    plan: free  # FREE TIER - $0/month (will hibernate after 15 min inactivity)
+    
+    # Root directory of the service
+    rootDir: backend
+    
+    # Build & start commands (optimized for Render)
+    buildCommand: |
+      pip install --upgrade pip setuptools wheel && \
+      pip install --no-cache-dir -r requirements-render.txt && \
+      mkdir -p logs data/uploads saved_models && \
+      python download_model.py && \
+      chmod +x startup-final.sh
+    
+    startCommand: ./startup-final.sh
+    
+    # Health check configuration
+    healthCheckPath: /health
+    healthCheckInterval: 30
+    healthCheckTimeout: 10
+    
+    # Environment variables
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: "true"
+      - key: PYTHONDONTWRITEBYTECODE
+        value: "true"
+      - key: API_HOST
+        value: "0.0.0.0"
+      - key: MODEL_ARCHITECTURE
+        value: "resnet50"
+      - key: DEVICE
+        value: "cpu"
+      - key: USE_AMP
+        value: "true"
+      - key: LOG_LEVEL
+        value: "INFO"
+      - key: NUM_WORKERS
+        value: "1"
+      - key: CORS_ORIGINS
+        value: "https://kidney-detection-frontend.onrender.com,http://localhost:5173,http://localhost:3000"
+      - key: PORT
+        value: "8000"
+      - key: WORKERS
+        value: "1"
+      - key: MAX_UPLOAD_SIZE
+        value: "50"
+
+  - type: static
+    name: kidney-detection-frontend
+    plan: free  # FREE TIER - $0/month
+    
+    # Root directory of the service
+    rootDir: frontend
+    
+    # Build command
+    buildCommand: npm install && npm run build
+    
+    # Static files directory
+    staticPublishPath: dist
+    
+    # Cache policy
+    headers:
+      - path: /index.html
+        name: Cache-Control
+        value: "no-cache, no-store, must-revalidate"
+      - path: /assets/*
+        name: Cache-Control
+        value: "public, max-age=31536000, immutable"
+    
+    # Environment variables
+    envVars:
+      - key: VITE_API_URL
+        value: "https://kidney-detection-backend.onrender.com"
+      - key: VITE_ENVIRONMENT
+        value: "production"
+      - key: VITE_DEBUG
+        value: "false"
