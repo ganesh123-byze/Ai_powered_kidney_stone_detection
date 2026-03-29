@@ -2,7 +2,6 @@ services:
   - type: web
     name: kidney-detection-backend
     runtime: python
-    pythonVersion: 3.11
     plan: free
     
     rootDir: backend
@@ -25,25 +24,20 @@ services:
         value: "1"
       - key: PORT
         value: "8000"
-      - key: DEVICE
-        value: "cpu"
 
   - type: web
     name: kidney-detection-frontend
     runtime: node
-    nodeVersion: 18
     plan: free
     
     rootDir: frontend
     
     buildCommand: npm install && npm run build
     
-    startCommand: npm run preview -- --host 0.0.0.0
+    startCommand: npm run preview -- --host 0.0.0.0 --port 3000
     
     envVars:
       - key: VITE_API_URL
         value: "https://kidney-detection-backend.onrender.com"
-      - key: VITE_ENVIRONMENT
-        value: "production"
       - key: PORT
         value: "3000"
