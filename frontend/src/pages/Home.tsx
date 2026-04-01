@@ -288,7 +288,7 @@ const Home: React.FC = () => {
                   </div>
                   <div className="mt-4 p-4 backdrop-blur-md bg-gradient-to-r from-blue-500/10 via-cyan-500/10 to-purple-500/10 border border-blue-400/20 rounded-2xl">
                     <p className="text-xs text-blue-200/70 text-center">
-                      <span className="font-semibold text-blue-300">Model Architecture:</span> ResNet50 • <span className="font-semibold text-cyan-300">Optimization:</span> Adam • <span className="font-semibold text-purple-300">Loss Function:</span> Binary CrossEntropy
+                      <span className="font-semibold text-blue-300">Model Architecture:</span> ResNet50 • <span className="font-semibold text-cyan-300">Optimization:</span> Adam W . <span className="font-semibold text-purple-300">Loss Function:</span> Binary CrossEntropy
                     </p>
                   </div>
                 </div>
