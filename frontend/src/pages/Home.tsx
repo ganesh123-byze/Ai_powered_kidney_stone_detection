@@ -354,7 +354,7 @@ const Home: React.FC = () => {
       <footer className="relative z-10 backdrop-blur-xl bg-slate-900/80 border-t border-white/10">
         <div className="mx-auto px-3 sm:px-4 lg:px-6 py-3 sm:py-4 max-w-7xl w-full">
           <p className="text-center text-xs text-blue-200/40">
-            © 2024 Kidney Detection AI • Enterprise Medical Solution
+            © 2026 Kidney Detection AI • Enterprise Medical Solution
           </p>
         </div>
       </footer>
