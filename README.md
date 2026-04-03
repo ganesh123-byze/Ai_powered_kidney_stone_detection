@@ -781,7 +781,7 @@ copies or substantial portions of the Software.
    - Include system information
 
 4. **Contact**
-   - Email: your-email@example.com
+   - Email: pedagadaganesh95@gmail.com
    - Discord: [Join Server](https://discord.gg/yourlink)
 
 ---
@@ -828,8 +828,8 @@ copies or substantial portions of the Software.
 
 ⭐ Star us on GitHub if you find this project useful!
 
-[GitHub](https://github.com/yourusername/kidney-detection) • 
-[Issues](https://github.com/yourusername/kidney-detection/issues) • 
-[Discussions](https://github.com/yourusername/kidney-detection/discussions)
+[GitHub](https://github.com/ganesh123-byze/kidney-detection) • 
+[Issues](https://github.com/ganesh123-byze/kidney-detection/issues) • 
+[Discussions](https://github.com/ganesh123-byze/kidney-detection/discussions)
 
 </div>
