@@ -828,8 +828,8 @@ copies or substantial portions of the Software.
 
 ⭐ Star us on GitHub if you find this project useful!
 
-[GitHub](https://github.com/ganesh123-byze/kidney-detection) • 
-[Issues](https://github.com/ganesh123-byze/kidney-detection/issues) • 
-[Discussions](https://github.com/ganesh123-byze/kidney-detection/discussions)
+[GitHub](https://github.com/ganesh123-byze/Ai_powered_kidney_stone_detection) • 
+[Issues](https://github.com/ganesh123-byze/Ai_powered_kidney_stone_detection/issues) • 
+[Discussions](https://github.com/ganesh123-byze/Ai_powered_kidney_stone_detection/discussions)
 
 </div>
