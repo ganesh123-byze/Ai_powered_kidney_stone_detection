@@ -758,7 +758,7 @@ copies or substantial portions of the Software.
 
 ## 👥 Authors & Contributors
 
-- **Your Name** - Initial development
+- **Your Name** - Pedagada Ganesh
 - **Contributors** - [Contributing guidelines](./CONTRIBUTING.md)
 
 ---
