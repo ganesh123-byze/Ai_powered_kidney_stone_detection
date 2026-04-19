@@ -148,14 +148,14 @@ async def global_exception_handler(request: Request, exc: Exception):
             "detail": str(exc) if os.getenv("DEBUG", "false").lower() == "true" else None
         }
     )
-
+ 
 
 # Include routers
 app.include_router(predict.router, prefix="/api/v1")
 app.include_router(upload.router, prefix="/api/v1")
 
 
-# Root endpoint
+# Root endpoint 
 @app.get("/", tags=["Root"])
 async def root():
     """Root endpoint with API information."""
@@ -235,6 +235,10 @@ async def quick_predict(request: Request):
             "confidence": result["confidence"],
             "severity": result["severity"]
         }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

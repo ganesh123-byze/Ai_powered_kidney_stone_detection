@@ -124,6 +124,11 @@ class InferenceService:
         is_valid, error_msg = self.preprocessor.validate_image(image_source)
         if not is_valid:
             raise ValueError(f"Invalid image: {error_msg}")
+
+        # Enforce ultrasound-only inputs (reject natural photos, etc.)
+        is_ultrasound, us_error = self.preprocessor.validate_ultrasound(image_source)
+        if not is_ultrasound:
+            raise ValueError(us_error or "Please upload ultrasound image")
         
         # Preprocess image to tensor (numpy array for ONNX)
         input_tensor = self.preprocessor.preprocess(image_source)
