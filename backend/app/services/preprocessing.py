@@ -36,11 +36,13 @@ class UltrasoundGate:
         reference_dirs: Optional[List[Path]] = None,
         max_reference_images: int = 300,
         hist_bins: int = 256,
+        reference_stats_path: Optional[Path] = None,
     ):
         self.enabled = enabled
         self.reference_dirs = reference_dirs or []
         self.max_reference_images = max_reference_images
         self.hist_bins = hist_bins
+        self.reference_stats_path = reference_stats_path
 
         self._ref_hist_mean: Optional[np.ndarray] = None
         self._ref_dist_threshold: Optional[float] = None
@@ -91,7 +93,45 @@ class UltrasoundGate:
         ref_dirs = cls._resolve_dirs(ref_dirs)
 
         max_imgs = int(os.getenv("ULTRASOUND_REFERENCE_MAX_IMAGES", "300"))
-        return cls(enabled=enabled, reference_dirs=ref_dirs, max_reference_images=max_imgs)
+
+        stats_path_env = os.getenv("ULTRASOUND_GATE_STATS_PATH")
+        stats_path = Path(stats_path_env) if stats_path_env else (cls._repo_root() / "backend/app/assets/ultrasound_gate_ref.json")
+        if not stats_path.is_absolute():
+            stats_path = (cls._repo_root() / stats_path).resolve()
+
+        return cls(
+            enabled=enabled,
+            reference_dirs=ref_dirs,
+            max_reference_images=max_imgs,
+            reference_stats_path=stats_path,
+        )
+
+    def _load_reference_stats(self) -> bool:
+        path = self.reference_stats_path
+        if not path:
+            return False
+        try:
+            if not path.exists():
+                return False
+            import json
+
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            hist_mean = np.array(data["ref_hist_mean"], dtype=np.float32)
+            self.hist_bins = int(data.get("hist_bins", int(hist_mean.shape[0])))
+            self._ref_hist_mean = hist_mean
+            self._ref_dist_threshold = float(data["ref_hist_threshold"])
+
+            self._ref_feat_mean = np.array(data["ref_feat_mean"], dtype=np.float32)
+            self._ref_feat_inv_cov = np.array(data["ref_feat_inv_cov"], dtype=np.float32)
+            self._ref_feat_threshold = float(data["ref_feat_threshold"])
+
+            logger.info(f"UltrasoundGate: loaded reference stats from {path}")
+            return True
+        except Exception as e:
+            logger.warning(f"UltrasoundGate: failed to load reference stats ({path}): {e}")
+            return False
 
     def _iter_reference_images(self) -> List[Path]:
         images: List[Path] = []
@@ -140,9 +180,13 @@ class UltrasoundGate:
 
         ref_images = self._iter_reference_images()
         if not ref_images:
+            if self._load_reference_stats():
+                self._built = True
+                return
+
             logger.warning(
                 "UltrasoundGate: no reference images found; using heuristic-only gating. "
-                f"Set ULTRASOUND_REFERENCE_DIRS or include dataset folders. tried={self.reference_dirs}"
+                f"Set ULTRASOUND_REFERENCE_DIRS or provide {self.reference_stats_path}. tried={self.reference_dirs}"
             )
             self._built = True
             return
